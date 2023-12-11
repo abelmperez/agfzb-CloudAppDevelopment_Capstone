@@ -3,16 +3,19 @@ from django.conf.urls.static import static
 from django.conf import settings
 from . import views
 
+from django.urls import path
+from .views import about, index, contact
+
 app_name = 'djangoapp'
 urlpatterns = [
     # route is a string contains a URL pattern
     # view refers to the view function
     # name the URL
-
+    path('', index, name='index'),
     # path for about view
-
+    path('about/', about, name='about'),
     # path for contact us view
-
+    path('contact/', contact, name='contact'),
     # path for registration
 
     # path for login
