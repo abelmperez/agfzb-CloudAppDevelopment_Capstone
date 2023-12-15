@@ -34,17 +34,9 @@ def get_request(url, **kwargs):
         return None
 
 def post_request(url, json_payload, **kwargs):
-    print(json_payload)
-    print("POST from {} ".format(url))
-    try:
-        response = requests.post(url, params=kwargs, json=json_payload)
-        status_code = response.status_code
-        print("With status {} ".format(status_code))
-        json_data = json.loads(response.text)
-        print(json_data)
-        return json_data
-    except:
-        print("Network exception occurred")
+    url =  "https://grimjoe47-5000.theiadockernext-1-labs-prod-theiak8s-4-tor01.proxy.cognitiveclass.ai/api/post_review"
+    response = requests.post(url, params=kwargs, json=json_payload)
+    return response
 
 def get_dealers_from_cf(url, **kwargs):
     results = []
@@ -66,22 +58,17 @@ def get_dealers_from_cf(url, **kwargs):
     print("############################################")
     return results
 
-def get_dealer_by_id_from_cf(url, id, **kwargs):
-    result = {}
-    # Call get_request with a URL parameter
+def get_dealer_by_id_from_cf(url, id):
     json_result = get_request(url, id=id)
+    # print('json_result from line 54',json_result)
+
     if json_result:
-        # Get the row list in JSON as dealers
-        dealers = json_result  
-        # For each dealer object
-        dealer = dealers[0]
-        # Create a CarDealer object with values in `doc` object
-        dealer_obj = CarDealer(address=dealer["address"], city=dealer["city"], full_name=dealer["full_name"],
-                                id=dealer["id"], lat=dealer["lat"], long=dealer["long"],
-                                short_name=dealer["short_name"],
-                                st=dealer["st"], zip=dealer["zip"])
-        result = dealer_obj
-    return result
+        dealers = json_result
+        dealer_doc = dealers[0]
+        dealer_obj = CarDealer(address=dealer_doc["address"], city=dealer_doc["city"],
+                                id=dealer_doc["id"], lat=dealer_doc["lat"], long=dealer_doc["long"], full_name=dealer_doc["full_name"],
+                                st=dealer_doc["st"], zip=dealer_doc["zip"], short_name=dealer_doc.get("short_name"))
+    return dealer_obj
 
 def get_dealer_reviews_from_cf(url, **kwargs):
     results = []
@@ -90,12 +77,25 @@ def get_dealer_reviews_from_cf(url, **kwargs):
         json_result = get_request(url, id=id)
     else:
         json_result = get_request(url)
-    print(json_result)
-    print("############################################")
+    print(json_result, "96")
     if json_result:
-        reviews = json_result
+        if isinstance(json_result, list):  # Check if json_result is a list
+            reviews = json_result
+        else:
+            reviews = json_result["data"]["docs"]
+
+        # Check if 'reviews' is a list of one dictionary
+        if isinstance(reviews, list) and len(reviews) == 1 and isinstance(reviews[0], dict):
+            reviews = reviews[0]
+
         for dealer_review in reviews:
-            print(dealer_review)
+            print("dealer_review--------------------", dealer_review)  # Print dealer_review
+            if isinstance(dealer_review, str):  # Check if dealer_review is a string
+                try:
+                    dealer_review = json.loads(dealer_review)
+                except json.JSONDecodeError:
+                    continue  # Skip this iteration if the JSON decoding fails
+
             review_obj = DealerReview(
                 dealership=dealer_review.get("dealership"),
                 name=dealer_review.get("name"),
@@ -109,10 +109,11 @@ def get_dealer_reviews_from_cf(url, **kwargs):
                 id=dealer_review.get("id")
             )
 
-            sentiment = analyze_review_sentiments(review_obj.review)
-            print(sentiment)
-            review_obj.sentiment = sentiment
+            # sentiment = analyze_review_sentiments(review_obj.review)
+            # print(sentiment)
+            # review_obj.sentiment = sentiment
             results.append(review_obj)
+
     return results
 
 # Create an `analyze_review_sentiments` method to call Watson NLU and analyze text

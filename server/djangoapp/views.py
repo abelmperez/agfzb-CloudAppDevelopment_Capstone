@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 def about(request):
     context = {}
     if request.method == "GET":
-        return render(request, 'djangoapp/about', context)
+        return render(request, 'djangoapp/about.html', context)
 
 
 # Create a `contact` view to return a static contact page
@@ -32,7 +32,7 @@ def about(request):
 def contact(request):
     context = {}
     if request.method == "GET":
-        return render(request, 'djangoapp/contact', context)
+        return render(request, 'djangoapp/contact.html', context)
 
 
 # Create a `login_request` view to handle sign in request
@@ -45,24 +45,24 @@ def login_request(request):
         if user is not None:
             login(request, user)
             messages.success(request, "Login successfully!")
-            return redirect('djangoapp:index')
+            return redirect(to=reverse('admin:index'))
         else:
             messages.warning(request, "Invalid username or password.")
-            return redirect("djangoapp:index")
+            return redirect('djangoapp:index')
 
 # Create a `logout_request` view to handle sign out request
 # def logout_request(request):
 def logout_request(request):
     print("Log out the user `{}`".format(request.user.username))
     logout(request)
-    return redirect(reverse('djangoapp:index'))
+    return redirect('djangoapp:index')
 
 # Create a `registration_request` view to handle sign up request
 # def registration_request(request):
 def registration_request(request):
     context = {}
     if request.method == 'GET':
-        return render(request, 'djangoapp/registration', context)
+        return render(request, 'djangoapp/registration.html', context)
     elif request.method == 'POST':
         # Check if user exists
         username = request.POST['username']
@@ -92,13 +92,14 @@ def get_dealerships(request):
     if request.method == "GET":
         context = {} #Create an empty dictionary named context
         url = "https://grimjoe47-3000.theiadockernext-1-labs-prod-theiak8s-4-tor01.proxy.cognitiveclass.ai/dealerships/get"
+        #url = "http://127.0.0.1:3000/dealerships/get"
         # Get dealers from the URL
         dealerships = get_dealers_from_cf(url)
         context['dealerships'] = dealerships #Assign the list of dealerships to the dealerships key in the context dictionary.
         # Concat all dealer's short name
         dealer_names = ' '.join([dealer.short_name for dealer in dealerships])
         # Return a list of dealer short name
-        return render(request, 'djangoapp/index', context) #Return the rendered HTML template.
+        return render(request, 'djangoapp/index.html', context) #Return the rendered HTML template.
 
 # Create a `get_dealer_details` view to render the reviews of a dealer
 def get_dealer_details(request, id):
@@ -113,7 +114,7 @@ def get_dealer_details(request, id):
          print(reviews)
          context['reviews'] = reviews
 
-         return render(request, 'djangoapp/dealer_details', context)
+         return render(request, 'djangoapp/dealer_details.html', context)
 
 
 # Create a `add_review` view to submit a review
@@ -122,12 +123,14 @@ def add_review(request, id):
     dealer_url = "https://grimjoe47-3000.theiadockernext-1-labs-prod-theiak8s-4-tor01.proxy.cognitiveclass.ai/dealerships/get/"
     dealer = get_dealer_by_id_from_cf(dealer_url, id=id)
     context["dealer"] = dealer
+
     if request.method == 'GET':
         # Get cars for the dealer
         cars = CarModel.objects.all()
         print(cars)
-        context["cars"] = cars        
-        return render(request, 'djangoapp/add_review', context)
+        context["cars"] = cars
+
+        return render(request, 'djangoapp/add_review.html', context)
     elif request.method == 'POST':
         if request.user.is_authenticated:
             username = request.user.username
@@ -148,10 +151,29 @@ def add_review(request, id):
             payload["car_make"] = car.make.name
             payload["car_model"] = car.name
             payload["car_year"] = int(car.year.strftime("%Y"))
-            
+
             new_payload = {}
             new_payload["review"] = payload
             review_post_url = "https://grimjoe47-5000.theiadockernext-1-labs-prod-theiak8s-4-tor01.proxy.cognitiveclass.ai/api/post_review"
 
+            review = {
+                "id": id,
+                "time": datetime.utcnow().isoformat(),
+                "name": request.user.username,
+                "dealership": id,
+                "review": request.POST["content"],
+                "purchase": True if "purchasecheck" in request.POST and request.POST["purchasecheck"] == 'on' else False,
+                "purchase_date": request.POST["purchasedate"],
+                "car_make": car.make.name,
+                "car_model": car.name,
+                "car_year": int(car.year.strftime("%Y")),
+            }
+            review_json = json.dumps(review, default=str)
+            new_payload1 = {}
+            new_payload1["review"] = review_json
+            print("\nREVIEW:", review_json)
             post_request(review_post_url, new_payload, id=id)
+            post_request(review_post_url, new_payload1, id=id)
+
         return redirect("djangoapp:dealer_details", id=id)
+
